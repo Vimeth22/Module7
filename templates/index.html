@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Module 7</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <style>
+        /* --- General Styling --- */
+        body { 
+            font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            padding: 30px; 
+            background-color: #e3f2fd; /* Light Blue Background (Color change is here) */
+            color: #333;
+        }
+        h1 { 
+            color: #1a237e; /* Deep blue header */
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        h3 {
+            background-color: #bbdefb; /* Lighter blue for title background */
+            color: #1a237e;
+            padding: 8px 0;
+            margin: 0;
+            font-size: 1.1em;
+            font-weight: 600;
+            border-bottom: 1px solid #90caf9;
+        }
+
+        /* --- Image Containers --- */
+        .container { 
+            display: flex; 
+            justify-content: center; 
+            gap: 20px; 
+            margin-top: 30px; 
+        }
+        .img-box { 
+            /* FIX 1: Using fixed percentage width on the container for stable scaling */
+            border: 1px solid #90caf9; /* Blue border */
+            border-radius: 8px;
+            overflow: hidden; 
+            position: relative; 
+            width: 45%; 
+            background-color: #ffffff; /* Ensure image area is white/light */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); 
+            transition: box-shadow 0.3s ease;
+        }
+        .img-box:hover {
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+        }
+        img { 
+            width: 100%; 
+            height: auto; 
+            display: block; 
+            cursor: crosshair; 
+        }
+        
+        /* --- Dot Styling --- */
+        .dot { 
+            position: absolute; width: 10px; height: 10px; 
+            background: #ff4757; 
+            border-radius: 50%; 
+            border: 2px solid white; 
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+            transform: translate(-50%, -50%); 
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        /* --- Status and Result Panels --- */
+        #status { 
+            background: #64b5f6; /* Medium blue status bar */
+            color: white;
+            padding: 15px 25px; 
+            border-radius: 8px; 
+            display: inline-block; 
+            font-weight: 700; 
+            width: 60%;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        #result {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #ffffff;
+            border: 1px solid #2196f3;
+            border-left: 5px solid #2196f3; /* Accent border */
+            border-radius: 8px;
+            display: inline-block;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            color: #1a237e;
+            font-weight: bold;
+            text-align: center;
+            min-width: 250px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        /* --- Button Styling --- */
+        button { 
+            padding: 10px 25px; 
+            font-size: 16px; 
+            margin-top: 25px; 
+            cursor: pointer; 
+            border: none;
+            border-radius: 5px;
+            background-color: #1565c0; /* Darker blue button */
+            color: white;
+            font-weight: 500;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+        button:hover {
+            background-color: #0d47a1;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Module 7 Demo</h1>
+
+    <div id="status">Step 1: Click the <b>CENTER</b> of the object in the <b>LEFT Image</b>.</div>
+    <div id="result">Waiting for Clicks...</div>
+
+    <div class="container">
+        <div class="img-box" id="box-left">
+            <h3>Left Eye View</h3>
+            <img id="img-left" src="{{ url_for('static', filename='left.jpg') }}">
+        </div>
+        <div class="img-box" id="box-right">
+            <h3>Right Eye View</h3>
+            <img id="img-right" src="{{ url_for('static', filename='right.jpg') }}">
+        </div>
+    </div>
+
+    <button onclick="location.reload()">Reset Measurement</button>
+
+    <script>
+        let step = 1; 
+        let pLeft = null, pRight = null;
+        let pMeasure1 = null, pMeasure2 = null;
+        let finalZ = 0;
+
+        const imgL = document.getElementById('img-left');
+        const imgR = document.getElementById('img-right');
+        const statusDiv = document.getElementById('status');
+        const resultDiv = document.getElementById('result');
+
+        // Coordinate calculation robust against headers and padding
+        function getCoords(e, img) {
+            const imgRect = img.getBoundingClientRect(); 
+            const parent = img.parentElement;           
+            const parentRect = parent.getBoundingClientRect(); 
+
+            // Scaling factors: Natural size vs. Displayed size
+            const scaleX = img.naturalWidth / imgRect.width;
+            const scaleY = img.naturalHeight / imgRect.height;
+            
+            // 1. Math Coordinates (for app.py): Scaled to the image's natural pixels
+            const x = (e.clientX - imgRect.left) * scaleX;
+            const y = (e.clientY - imgRect.top) * scaleY;
+            
+            // 2. Drawing Coordinates (for dot): Relative to the *parent container* (box-left/right)
+            const cssX = e.clientX - parentRect.left;
+            const cssY = e.clientY - parentRect.top;
+
+            return { x, y, cssX, cssY };
+        }
+
+        function drawDot(x, y, parent) {
+            let d = document.createElement('div');
+            d.className = 'dot';
+            d.style.left = x + 'px'; 
+            d.style.top = y + 'px';  
+            parent.appendChild(d);
+        }
+
+        // --- Left Image Clicks ---
+        imgL.addEventListener('click', (e) => {
+            let c = getCoords(e, imgL);
+            const boxLeft = document.getElementById('box-left');
+            
+            if (step === 1) {
+                // Step 1: Click center for depth calculation
+                pLeft = c;
+                boxLeft.querySelectorAll('.dot').forEach(dot => dot.remove()); 
+                document.getElementById('box-right').querySelectorAll('.dot').forEach(dot => dot.remove()); 
+
+                drawDot(c.cssX, c.cssY, boxLeft);
+                statusDiv.innerHTML = "Step 2: Click the <b>SAME CENTER POINT</b> in the <b>RIGHT Image</b>.";
+                step = 2;
+            } 
+            else if (step === 3) {
+                // Step 3: First click for size measurement (clears previous size dots)
+                boxLeft.querySelectorAll('.dot:not(:first-child)').forEach(dot => dot.remove()); 
+
+                pMeasure1 = c;
+                drawDot(c.cssX, c.cssY, boxLeft);
+                statusDiv.innerHTML = "Step 4: Click the <b>OTHER EDGE</b> to finish measuring.";
+                step = 4;
+            } 
+            else if (step === 4) {
+                // Step 4: Second click for size measurement
+                pMeasure2 = c;
+                drawDot(c.cssX, c.cssY, boxLeft);
+                statusDiv.innerHTML = "Calculating Size...";
+                
+                fetch('/calculate_size', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ p1: pMeasure1, p2: pMeasure2, Z: finalZ, img_w: imgL.naturalWidth, img_h: imgL.naturalHeight })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    resultDiv.innerHTML = `Depth (Z): ${finalZ} cm<br>Size: ${data.size_cm} cm`;
+                    statusDiv.innerHTML = "Measurement Complete! Click 'Reset' to begin again.";
+                    step = 3; 
+                });
+            }
+        });
+
+        // --- Right Image Click ---
+        imgR.addEventListener('click', (e) => {
+            if (step === 2) {
+                let c = getCoords(e, imgR);
+                pRight = c;
+                document.getElementById('box-right').querySelectorAll('.dot').forEach(dot => dot.remove());
+                drawDot(c.cssX, c.cssY, document.getElementById('box-right'));
+                statusDiv.innerHTML = "Calculating Depth (Z)...";
+                
+                fetch('/calculate_stereo', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ p_left: pLeft, p_right: pRight, img_w: imgL.naturalWidth, img_h: imgL.naturalHeight })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if(data.error) { alert(data.error); location.reload(); return; }
+                    finalZ = data.Z;
+                    resultDiv.innerHTML = `Calculated Depth (Z): ${finalZ} cm`;
+                    statusDiv.innerHTML = "Step 3: Click two points on the <b>LEFT Image</b> to measure size.";
+                    step = 3;
+                });
+            }
+        });
+    </script>
+</body>
+</html>
