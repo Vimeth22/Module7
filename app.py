@@ -3,7 +3,7 @@ import math
 
 app = Flask(__name__)
 
-# 1. Camera Calibration (from Assignment 1)
+# 1. Camera Calibration from Module 1
 # These values correspond to the original 1280x720 resolution.
 ORIG_FX = 991.396
 ORIG_FY = 991.628
